@@ -2,35 +2,27 @@ addEventListener("fetch", (event) => {
   event.respondWith(handleRequest(event.request));
 });
 
-async function handleRequest(request: Request): Promise<Response> {
-  const upgrade = request.headers.get("upgrade") || "";
-  if (upgrade.toLowerCase() !== "websocket") {
-    return new Response("WebSocket only", { status: 400 });
+async function handleRequest(req: Request): Promise<Response> {
+  const upgrade = req.headers.get("upgrade") || "";
+  if (upgrade.toLowerCase() != "websocket") {
+    return new Response("Only WebSocket supported", { status: 400 });
   }
 
-  const { socket, response } = Deno.upgradeWebSocket(request);
+  const { socket, response } = Deno.upgradeWebSocket(req);
 
   socket.onopen = () => {
-    const target = new WebSocket("wss://us2-full.privateip.net/cdn-cgi/trace", [
-      "vless"
-    ]);
+    const target = new WebSocket("wss://us2-full.privateip.net/cdn-cgi/trace");
 
     target.onopen = () => {
-      socket.onmessage = (msg) => target.send(msg.data);
-      target.onmessage = (msg) => socket.send(msg.data);
+      socket.onmessage = (e) => target.send(e.data);
+      target.onmessage = (e) => socket.send(e.data);
     };
 
-    target.onerror = (e) => {
-      console.log("Target error:", e);
-      socket.close(1011, "target error");
-    };
-
+    target.onerror = () => socket.close(1011, "target error");
     target.onclose = () => socket.close(1000, "target closed");
   };
 
-  socket.onerror = (e) => {
-    console.log("Socket error:", e);
-  };
+  socket.onerror = () => {};
 
   return response;
 }
